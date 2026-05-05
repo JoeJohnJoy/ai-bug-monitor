@@ -1,0 +1,31 @@
+{
+  "name": "ai-lib-contrib",
+  "image": "mcr.microsoft.com/devcontainers/python:3.12",
+  "features": {
+    "ghcr.io/devcontainers-contrib/features/uv:1": {}
+  },
+  "mounts": [
+    "source=ai-lib-contrib-venv,target=/workspaces/Projects_Code/ai_lib_contrib/.venv,type=volume"
+  ],
+  "postCreateCommand": "uv sync",
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "ms-python.python",
+        "ms-python.vscode-pylance",
+        "charliermarsh.ruff"
+      ],
+      "settings": {
+        "python.defaultInterpreterPath": ".venv/bin/python",
+        "editor.formatOnSave": true,
+        "[python]": {
+          "editor.defaultFormatter": "charliermarsh.ruff"
+        }
+      }
+    }
+  },
+  "remoteEnv": {
+    "UV_PROJECT_ENVIRONMENT": "/workspaces/Projects_Code/ai_lib_contrib/.venv",
+    "UV_LINK_MODE": "copy"
+  }
+}

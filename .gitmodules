@@ -1,0 +1,20 @@
+[submodule "libs/transformers"]
+	path = libs/transformers
+	url = git@github.com:huggingface/transformers.git
+	shallow = true
+[submodule "libs/langchain"]
+	path = libs/langchain
+	url = git@github.com:langchain-ai/langchain.git
+	shallow = true
+[submodule "libs/llama_index"]
+	path = libs/llama_index
+	url = git@github.com:run-llama/llama_index.git
+	shallow = true
+[submodule "libs/anthropic-sdk-python"]
+	path = libs/anthropic-sdk-python
+	url = git@github.com:anthropics/anthropic-sdk-python.git
+	shallow = true
+[submodule "libs/openai-python"]
+	path = libs/openai-python
+	url = git@github.com:openai/openai-python.git
+	shallow = true

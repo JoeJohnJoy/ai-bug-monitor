@@ -1,0 +1,27 @@
+repos:
+  - org: huggingface
+    name: transformers
+    local_path: libs/transformers
+    labels: [bug]
+  - org: langchain-ai
+    name: langchain
+    local_path: libs/langchain
+    labels: [bug]
+  - org: run-llama
+    name: llama_index
+    local_path: libs/llama_index
+    labels: [bug]
+  - org: anthropics
+    name: anthropic-sdk-python
+    local_path: libs/anthropic-sdk-python
+    labels: [bug]
+  - org: openai
+    name: openai-python
+    local_path: libs/openai-python
+    labels: [bug]
+
+monitor:
+  lookback_hours: 24        # only fetch issues opened/updated within this window
+  max_issues_per_repo: 3    # cap per run to avoid rate limits
+  auto_submit_pr: false     # set true to open PRs automatically
+  solutions_dir: solutions
