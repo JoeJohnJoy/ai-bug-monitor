@@ -1,24 +1,13 @@
-"""Analyze a GitHub bug issue using Claude and produce a diagnosis + patch."""
+"""Analyze a GitHub bug issue using the Claude Code CLI (no API key needed)."""
 
-import os
 import re
+import subprocess
+import shutil
 from pathlib import Path
-
-import anthropic
 
 from .fetch_issues import fetch_file
 
-_client: anthropic.Anthropic | None = None
-
-
-def _get_client() -> anthropic.Anthropic:
-    global _client
-    if _client is None:
-        _client = anthropic.Anthropic(api_key=os.environ["ANTHROPIC_API_KEY"])
-    return _client
-
-
-_SYSTEM = """\
+_PROMPT_TEMPLATE = """\
 You are an expert open-source contributor specializing in Python AI/ML libraries.
 Given a GitHub bug issue and relevant source code, you will:
 1. Diagnose the root cause clearly and concisely.
@@ -36,9 +25,19 @@ Format your response with these exact sections:
 
 ## Explanation
 <why this fix is correct>
+
+---
+
+Repository: {org}/{name}
+Issue #{number}: {title}
+URL: {url}
+
+**Description:**
+{body}
+{comments_text}
+{code_context}
 """
 
-# Patterns to extract file paths mentioned in issue text
 _FILE_RE = re.compile(r'[\w/\-]+\.py')
 
 
@@ -56,59 +55,54 @@ def _build_context(issue: dict) -> str:
     for path in hints:
         content = fetch_file(org, name, path)
         if content:
-            # Truncate large files to avoid context bloat
             lines = content.splitlines()[:300]
             snippets.append(f"### {path}\n```python\n" + "\n".join(lines) + "\n```")
 
-    return "\n\n".join(snippets)
+    return ("\n**Relevant source files:**\n" + "\n\n".join(snippets)) if snippets else ""
 
 
 def analyze_issue(issue: dict) -> dict:
-    """Call Claude to diagnose the bug and return a structured analysis dict."""
+    """Run Claude Code CLI to diagnose the bug. No API key required."""
+    if not shutil.which("claude"):
+        raise RuntimeError("Claude Code CLI not found. Install it with: npm install -g @anthropic-ai/claude-code")
+
     org = issue["repo"]["org"]
     name = issue["repo"]["name"]
     number = issue["number"]
-
-    code_context = _build_context(issue)
 
     comments_text = ""
     if issue["comments"]:
         comments_text = "\n\n**Comments:**\n" + "\n---\n".join(issue["comments"])
 
-    user_content = f"""\
-Repository: {org}/{name}
-Issue #{number}: {issue["title"]}
-URL: {issue["url"]}
-
-**Description:**
-{issue["body"]}
-{comments_text}
-
-{"**Relevant source files:**" + chr(10) + code_context if code_context else ""}
-"""
-
-    client = _get_client()
-    response = client.messages.create(
-        model="claude-sonnet-4-6",
-        max_tokens=2048,
-        system=[
-            {
-                "type": "text",
-                "text": _SYSTEM,
-                "cache_control": {"type": "ephemeral"},  # cache system prompt
-            }
-        ],
-        messages=[{"role": "user", "content": user_content}],
+    prompt = _PROMPT_TEMPLATE.format(
+        org=org,
+        name=name,
+        number=number,
+        title=issue["title"],
+        url=issue["url"],
+        body=issue["body"],
+        comments_text=comments_text,
+        code_context=_build_context(issue),
     )
 
-    analysis_text = response.content[0].text
+    result = subprocess.run(
+        ["claude", "--print", prompt],
+        capture_output=True,
+        text=True,
+        timeout=120,
+    )
+
+    if result.returncode != 0:
+        raise RuntimeError(f"Claude CLI error: {result.stderr.strip()}")
+
+    analysis_text = result.stdout.strip()
 
     return {
         "issue": issue,
         "analysis": analysis_text,
-        "model": response.model,
-        "input_tokens": response.usage.input_tokens,
-        "output_tokens": response.usage.output_tokens,
+        "model": "claude-code-cli",
+        "input_tokens": None,
+        "output_tokens": None,
     }
 
 
@@ -139,7 +133,7 @@ def save_analysis(result: dict, solutions_dir: str) -> Path:
 {result["analysis"]}
 
 ---
-*Analyzed by {result["model"]} — {result["input_tokens"]} input / {result["output_tokens"]} output tokens*
+*Analyzed via Claude Code CLI*
 """
     out_path.write_text(content)
     return out_path
