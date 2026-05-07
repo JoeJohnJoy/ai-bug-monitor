@@ -22,18 +22,16 @@ jobs:
 
       - name: Install dependencies
         run: uv sync
-        working-directory: ai_lib_contrib
 
       - name: Run bug monitor
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: uv run python main.py
-        working-directory: ai_lib_contrib
 
       - name: Commit new solutions
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add ai_lib_contrib/solutions/
+          git add solutions/
           git diff --cached --quiet || git commit -m "chore: add bug analyses [skip ci]"
           git push
