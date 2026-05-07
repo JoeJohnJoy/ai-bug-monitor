@@ -27,7 +27,6 @@ jobs:
       - name: Run bug monitor
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
         run: uv run python main.py
         working-directory: ai_lib_contrib
 
