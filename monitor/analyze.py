@@ -1,11 +1,15 @@
-"""Analyze a GitHub bug issue using the Claude Code CLI (no API key needed)."""
+"""Analyze a GitHub bug issue using GitHub Models API (free, uses GITHUB_TOKEN)."""
 
+import os
 import re
-import subprocess
-import shutil
 from pathlib import Path
 
+import httpx
+
 from .fetch_issues import fetch_file
+
+GITHUB_MODELS_URL = "https://models.inference.ai.azure.com/chat/completions"
+MODEL = "gpt-4o"
 
 _PROMPT_TEMPLATE = """\
 You are an expert open-source contributor specializing in Python AI/ML libraries.
@@ -62,9 +66,10 @@ def _build_context(issue: dict) -> str:
 
 
 def analyze_issue(issue: dict) -> dict:
-    """Run Claude Code CLI to diagnose the bug. No API key required."""
-    if not shutil.which("claude"):
-        raise RuntimeError("Claude Code CLI not found. Install it with: npm install -g @anthropic-ai/claude-code")
+    """Call GitHub Models API to diagnose the bug. Uses GITHUB_TOKEN — no extra credentials needed."""
+    token = os.environ.get("GITHUB_TOKEN", "")
+    if not token:
+        raise RuntimeError("GITHUB_TOKEN is not set")
 
     org = issue["repo"]["org"]
     name = issue["repo"]["name"]
@@ -85,24 +90,33 @@ def analyze_issue(issue: dict) -> dict:
         code_context=_build_context(issue),
     )
 
-    result = subprocess.run(
-        ["claude", "--print", prompt],
-        capture_output=True,
-        text=True,
-        timeout=120,
-    )
+    payload = {
+        "model": MODEL,
+        "messages": [{"role": "user", "content": prompt}],
+        "temperature": 0.2,
+    }
 
-    if result.returncode != 0:
-        raise RuntimeError(f"Claude CLI error: {result.stderr.strip()}")
+    with httpx.Client(timeout=120) as client:
+        resp = client.post(
+            GITHUB_MODELS_URL,
+            headers={
+                "Authorization": f"Bearer {token}",
+                "Content-Type": "application/json",
+            },
+            json=payload,
+        )
+        resp.raise_for_status()
+        data = resp.json()
 
-    analysis_text = result.stdout.strip()
+    analysis_text = data["choices"][0]["message"]["content"].strip()
+    usage = data.get("usage", {})
 
     return {
         "issue": issue,
         "analysis": analysis_text,
-        "model": "claude-code-cli",
-        "input_tokens": None,
-        "output_tokens": None,
+        "model": MODEL,
+        "input_tokens": usage.get("prompt_tokens"),
+        "output_tokens": usage.get("completion_tokens"),
     }
 
 
@@ -133,7 +147,7 @@ def save_analysis(result: dict, solutions_dir: str) -> Path:
 {result["analysis"]}
 
 ---
-*Analyzed via Claude Code CLI*
+*Analyzed via GitHub Models ({result["model"]})*
 """
     out_path.write_text(content)
     return out_path
